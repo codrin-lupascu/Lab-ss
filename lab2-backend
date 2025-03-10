@@ -1,31 +1,14 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 import paho.mqtt.client as mqtt
 import os
-import boto3
 from uuid import uuid4
 
 app = FastAPI()
 
-# Configurație MinIO
-MINIO_ENDPOINT = "localhost:9000"
-MINIO_ACCESS_KEY = "minioadmin"
-MINIO_SECRET_KEY = "minioadmin"
-BUCKET_NAME = "images"
-
-# Inițializează clientul MinIO
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=f"http://{MINIO_ENDPOINT}",
-    aws_access_key_id=MINIO_ACCESS_KEY,
-    aws_secret_access_key=MINIO_SECRET_KEY,
-)
-
-# Asigură că bucket-ul există
-try:
-    s3_client.create_bucket(Bucket=BUCKET_NAME)
-except:
-    pass
+# Folder pentru imaginile salvate local
+STORAGE_DIR = "storage"
+os.makedirs(STORAGE_DIR, exist_ok=True)
 
 # MQTT Config
 MQTT_BROKER = "localhost"
@@ -35,13 +18,12 @@ MQTT_TOPIC = "camera/image"
 def on_message(client, userdata, msg):
     """ Callback pentru mesajele MQTT primite """
     image_name = f"{uuid4()}.jpg"
-    with open(image_name, "wb") as f:
+    image_path = os.path.join(STORAGE_DIR, image_name)
+    
+    with open(image_path, "wb") as f:
         f.write(msg.payload)
     
-    # Salvează imaginea în MinIO
-    s3_client.upload_file(image_name, BUCKET_NAME, image_name)
-    os.remove(image_name)
-    print(f"Saved {image_name} to MinIO")
+    print(f"Saved {image_name} to local storage")
 
 mqtt_client = mqtt.Client()
 mqtt_client.on_message = on_message
@@ -53,23 +35,23 @@ mqtt_client.loop_start()
 async def upload_image(file: UploadFile = File(...)):
     """ Endpoint pentru upload manual de imagini """
     image_name = f"{uuid4()}.jpg"
+    image_path = os.path.join(STORAGE_DIR, image_name)
     
-    with open(image_name, "wb") as f:
+    with open(image_path, "wb") as f:
         f.write(await file.read())
-
-    # Salvează în MinIO
-    s3_client.upload_file(image_name, BUCKET_NAME, image_name)
-    os.remove(image_name)
 
     return JSONResponse(content={"message": "Image uploaded", "filename": image_name})
 
 @app.get("/images/")
 def list_images():
-    """ Endpoint pentru listarea imaginilor stocate """
-    images = [img["Key"] for img in s3_client.list_objects_v2(Bucket=BUCKET_NAME).get("Contents", [])]
+    """ Endpoint pentru listarea imaginilor salvate """
+    images = os.listdir(STORAGE_DIR)
     return {"images": images}
 
 @app.get("/images/{image_name}")
 def get_image(image_name: str):
     """ Endpoint pentru descărcarea unei imagini """
-    return JSONResponse(content={"url": f"http://{MINIO_ENDPOINT}/{BUCKET_NAME}/{image_name}"})
+    image_path = os.path.join(STORAGE_DIR, image_name)
+    if os.path.exists(image_path):
+        return FileResponse(image_path)
+    return JSONResponse(content={"error": "File not found"}, status_code=404)
