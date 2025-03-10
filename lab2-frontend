@@ -40,7 +40,7 @@ function App() {
       <div>
         {images.map((image, index) => (
           <div key={index}>
-            <img src={`http://localhost:9000/images/${image}`} alt={image} width="200" />
+            <img src={`${API_BASE}/images/${image}`} alt={image} width="200" />
             <p>{image}</p>
           </div>
         ))}
