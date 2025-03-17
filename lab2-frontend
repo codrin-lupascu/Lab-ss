@@ -1,52 +1,25 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-
-const API_BASE = "http://localhost:8000";
-
-function App() {
-  const [images, setImages] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  useEffect(() => {
-    fetchImages();
-  }, []);
-
-  const fetchImages = async () => {
-    const response = await axios.get(`${API_BASE}/images/`);
-    setImages(response.data.images);
-  };
-
-  const handleFileChange = (event) => {
-    setSelectedFile(event.target.files[0]);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-
-    await axios.post(`${API_BASE}/upload/`, formData);
-    fetchImages(); // Reîncarcă lista de imagini
-  };
-
-  return (
-    <div style={{ textAlign: "center", padding: "20px" }}>
-      <h2>Upload & View Images</h2>
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload}>Upload</button>
-
-      <h3>Stored Images</h3>
-      <div>
-        {images.map((image, index) => (
-          <div key={index}>
-            <img src={`${API_BASE}/images/${image}`} alt={image} width="200" />
-            <p>{image}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export default App;
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Upload</title>
+</head>
+<body>
+    <h2>Upload Image</h2>
+    <input type="file" id="fileInput">
+    <button onclick="uploadImage()">Upload</button>
+    <script>
+        function uploadImage() {
+            let fileInput = document.getElementById('fileInput');
+            let file = fileInput.files[0];
+            let formData = new FormData();
+            formData.append('file', file);
+            fetch('http://192.168.56.10:8000/upload/', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json()).then(data => {
+                alert('Uploaded: ' + data.filename);
+            });
+        }
+    </script>
+</body>
+</html>
